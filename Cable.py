@@ -74,17 +74,6 @@ def vectorField(points, t):
 
 """ CREATING THE MESH """
 
-# x = np.linspace(-3, 3, 30)
-# y = np.linspace(-3, 3, 30)
-# z = np.linspace(-5, 5, 10)
-#
-#
-# # TODO Here we ad information of how we want our z axis
-# X, Y, Z = np.meshgrid(x, y, z)
-# # Z = np.zeros_like(X)
-
-
-
 
 # Radial, angular, and vertical sampling
 r = np.linspace(0, 3, 15)       # uniform in radius
@@ -102,35 +91,6 @@ Y = R * np.sin(THETA)
 
 
 points = np.column_stack((X.ravel(), Y.ravel(), Z.ravel()))
-
-
-
-
-# # Create the first frame
-# new_points, vectors, magnitudes, colors = vectorField(points, t=0)
-# pdata = pv.PolyData(new_points)
-# pdata['vectors'] = vectors       # attach vectors to points
-# pdata['magnitude'] = np.sqrt(magnitudes)  # attach scalars for color
-# pdata['scale'] = np.sqrt(magnitudes)  # attach scalars for color
-# pdata['colors'] = colors  # attach scalars for color
-#
-#
-# arrows = pdata.glyph(
-#     orient='vectors',      # use the 'vectors' array for direction
-#     scale=False,           # don't scale arrows by magnitude (optional)
-#     factor=1.0             # global scaling factor for arrow size
-# )
-#
-#
-# plotter = pv.Plotter()
-#
-# actor = plotter.add_mesh(
-#     arrows,
-#     scalars='colors',   # color by this scalar
-#     cmap='plasma',        # choose any Matplotlib colormap
-#     lighting=True,
-# )
-
 
 
 
@@ -183,19 +143,19 @@ actor_mag = plotter.add_mesh(
 
 plotter.show_grid(color = "gray")
 
+cylinder = pv.Cylinder(
+        center = (0, 0, 0),
+        direction = (0, 0, 1),
+        radius = 0.1,
+        height = 15,
+        resolution = 15,
+        )
 
+
+cyl_actor = plotter.add_mesh(cylinder, color = "white")
 
 # --- Animation callback using timer events ---
 def update_field(t):
-    # new_points, vectors, magnitudes, colors = vectorField(points, t)
-    # pdata['vectors'] = vectors
-    # pdata['magnitude'] = magnitudes
-    #
-    # new_arrows = pdata.glyph(orient='vectors', scale=doScale, factor=scaleFactor)
-    # actor.mapper.SetInputData(new_arrows)
-
-
-    
     vectors_el, vectors_mag, magnitudes_el, magnitudes_mag = vectorField(points, t)
 
     pdata['vectors_el'] = vectors_el 
@@ -253,5 +213,3 @@ while True:
     if running:
         t += 0.01
 
-# Keep the window open interactively after animation
-plotter.show(auto_close=False)

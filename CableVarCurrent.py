@@ -8,6 +8,7 @@ doScale_mag = "magnitude_mag"
 # doScale = "magnitude"
 scaleFactor = 0.5
 
+t = 0.0
 k = 1.0
 
 def current(t):
@@ -155,6 +156,18 @@ plotter.show_grid(color = "gray")
 
 
 
+cylinder = pv.Cylinder(
+        center = (0, 0, 0),
+        direction = (0, 0, 1),
+        radius = 0.1,
+        height = 15,
+        resolution = 15,
+        )
+
+
+cyl_actor = plotter.add_mesh(cylinder, color = "white")
+
+
 # --- Animation callback using timer events ---
 def update_field(t):
     
@@ -170,7 +183,6 @@ def update_field(t):
 
     new_arrows_mag = pdata.glyph(orient='vectors_mag', scale=doScale_mag, factor=scaleFactor)
     actor_mag.mapper.SetInputData(new_arrows_mag)
-
 
 
 
@@ -190,7 +202,6 @@ plotter.add_key_event("space", toggle_pause)
 
 
 
-t = 0.0
 
 def past():
     global t

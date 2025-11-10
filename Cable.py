@@ -199,7 +199,6 @@ def future():
 
 
 # Keyboard event for spacebar
-plotter.add_key_event("space", toggle_pause)
 plotter.add_key_event("n", past)
 plotter.add_key_event("m", future)
 

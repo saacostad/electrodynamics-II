@@ -185,8 +185,6 @@ def toggle_pause():
     running = not running
     print("Animation running:" if running else "Animation paused.")
 
-# Keyboard event for spacebar
-plotter.add_key_event("space", toggle_pause)
 
 
 
@@ -213,5 +211,5 @@ while True:
     plotter.render()
 
     if running:
-        t += 0.1
+        t += 0.05
 

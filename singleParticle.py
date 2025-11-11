@@ -7,12 +7,18 @@ from numba import njit
 doScale_el = "magnitude_el" 
 doScale_mag = "magnitude_mag" 
 # doScale = "magnitude"
-scaleFactor = 3.0
+scaleFactor = 5.0
+
+
+mag_el = 0.0 
+mag_mag = 1.0 
+
 
 dt = 0.1
 
-a = 0.0 
-b = 2.5 
+a = 0.8 
+b = 3.0 
+B = 0.1
 
 q = 1.0
 epsilon0 = 1.0
@@ -20,22 +26,31 @@ c = 1.0
 factor = (q / (4 * np.pi * epsilon0))
 
 
-densityx = 20 
-limitsx = -2
+densityx = 15 
+limitsx = -3
 
-densityy = 20 
-limitsy = -2
+densityy = 30 
+limitsy = -8
 
-densityz = 3 
-limitsz = -1
+densityz = 10 
+limitsz = 2
 
 
 
 pt = sp.Symbol("pt")
 
-px_simp= 0.1 * sp.sin(b * pt) 
-py_simp= 0.1 * sp.cos(b * pt)
-pz_simp= a * pt 
+
+
+# Circular motion
+# px_simp= B * sp.sin(b * pt) 
+# py_simp= B * sp.cos(b * pt)
+# pz_simp= a * pt 
+
+
+px_simp = 0.0 * pt  
+py_simp = a * pt - 10.0 
+pz_simp = 0.0 * pt
+
 
 vx_simp= sp.diff(px_simp, pt)
 vy_simp= sp.diff(py_simp, pt)
@@ -132,15 +147,6 @@ def vectorField(points, ps, vs, As, t):
     # Taking the points
     x, y, z = points[:, 0], points[:, 1], points[:, 2],
 
-   #  """ Definition of the magnetic field field """
-   #  
-   #  s = np.sqrt( np.power(x, 2) + np.power(y, 2) )
-    # phi = np.arctan2(y, x)
-
-    u_mag = np.zeros_like(x)
-    v_mag = np.zeros_like(x)
-    w_mag = np.zeros_like(x)
-
     
 
     """ Contruction of the electric field """ 
@@ -183,12 +189,12 @@ def vectorField(points, ps, vs, As, t):
     ry = factor * total[:, 1]  
     rz = factor * total[:, 2]
 
-
     """ RETURN OF VALUES: DO NOT TOUCH """
     
     # Reconstructing the mesh 
-    vectors_mag = np.column_stack((u_mag, v_mag, w_mag))
     vectors_el = np.column_stack((rx, ry, rz))
+    vectors_mag = c * np.cross(R_uni, vectors_el, axis = 1)
+
 
     vectors_all = np.concatenate([vectors_mag, vectors_el])
     points_all = np.concatenate([points, points])
@@ -235,8 +241,8 @@ pdata = pv.PolyData(points)
 pdata['vectors_el'] = vectors_el       # attach vectors to points
 pdata['vectors_mag'] = vectors_mag       # attach vectors to points
 
-pdata['magnitude_el'] = np.clip(magnitudes_el, None, 1.0)  # attach scalars for color
-pdata['magnitude_mag'] = np.clip(magnitudes_mag, None, 1.0)  # attach scalars for color
+pdata['magnitude_el'] = np.clip(magnitudes_el, 0.0, 1.0) * mag_el # attach scalars for color
+pdata['magnitude_mag'] = np.clip(magnitudes_mag, 0.0, 1.0) * mag_mag # attach scalars for color
 
 
 pdata['col_el'] = magnitudes_el  # attach scalars for color
@@ -298,8 +304,8 @@ def update_field(t):
 
     pdata['vectors_el'] = vectors_el 
     pdata['vectors_mag'] = vectors_mag 
-    pdata['magnitude_el'] = np.clip(magnitudes_el, None, 0.1)
-    pdata['magnitude_mag'] = np.clip(magnitudes_mag, None, 0.1)
+    pdata['magnitude_el'] = np.clip(magnitudes_el, None, 0.1) * mag_el
+    pdata['magnitude_mag'] = np.clip(magnitudes_mag, None, 0.1) * mag_mag
     pdata['col_el'] = 10 - 1 / magnitudes_el 
     pdata['col_mag'] = magnitudes_mag
 
@@ -329,10 +335,6 @@ def toggle_pause():
     global running
     running = not running
     print("Animation running:" if running else "Animation paused.")
-
-# Keyboard event for spacebar
-plotter.add_key_event("space", toggle_pause)
-
 
 
 t = 0.0

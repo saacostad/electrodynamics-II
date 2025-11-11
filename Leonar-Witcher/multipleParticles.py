@@ -1,14 +1,40 @@
 import pyvista as pv 
 import numpy as np
 import sympy as sp 
-from scipy.optimize import root_scalar
-from numba import njit 
-from multiprocessing import Pool, cpu_count
-from functools import partial
+
+
+pt = sp.Symbol("pt")
+def createParticleTrayectories(px_simp, py_simp, pz_simp, qp):
+    vx_simp= sp.diff(px_simp, pt)
+    vy_simp= sp.diff(py_simp, pt)
+    vz_simp= sp.diff(pz_simp, pt)
+
+    Ax_simp= sp.diff(vx_simp, pt)
+    Ay_simp= sp.diff(vy_simp, pt)
+    Az_simp= sp.diff(vz_simp, pt)
+
+    px = sp.lambdify((pt),px_simp)
+    py = sp.lambdify((pt),py_simp)
+    pz = sp.lambdify((pt),pz_simp)
+
+    vx = sp.lambdify((pt),vx_simp)
+    vy = sp.lambdify((pt),vy_simp)
+    vz = sp.lambdify((pt),vz_simp)
+
+    Ax = sp.lambdify((pt),Ax_simp)
+    Ay = sp.lambdify((pt),Ay_simp)
+    Az = sp.lambdify((pt),Az_simp)
+
+
+    ps = [px, py, pz]
+    vs = [vx, vy, vz]
+    As = [Ax, Ay, Az]
+
+    return (ps, vs, As, qp)
 
 
 do_poynting = False
-
+cords = "sphe"
 
 doScale_el = "magnitude_el" 
 doScale_mag = "magnitude_mag"
@@ -26,70 +52,50 @@ dt = 0.1
 t0 = 5.0
 
 a = 0.03 
-b = 3.0 
-B = 0.1
+b = 4.0 
+B = 0.05
 
-q = 1.0
 epsilon0 = 1.0
 c = 1.0
-factor = (q / (4 * np.pi * epsilon0))
+factor = (1.0 / (4 * np.pi * epsilon0))
 mu0 = 1.0
 
-densityx = 50 
+densityx = 30 
 limitsx = 5.0
 
-densityy = 50 
+densityy = 30 
 limitsy = 5.0
 
-densityz = 3 
-limitsz = 1.0
+densityz = 30 
+limitsz = 5.0
+
+
+rad_lim = 5
+rad_den = 8 
+theta_den = 30 
+phi_den = 30
 
 
 
-pt = sp.Symbol("pt")
-
-
+""" MOTION OF THE PARTICLES """
 
 # Circular motion
-# px_simp= B * sp.sin(b * pt) 
-# py_simp= B * sp.cos(b * pt)
-# pz_simp= a * pt 
+px1 = B * sp.cos(b * pt) 
+py1 = 0.0 * pt 
+pz1 = 0.0 * pt 
+q1 = 1.0 
 
 
-px_simp = 0.0 * pt  
-py_simp = a * pt * pt - 8.1251241 
-pz_simp = 0.0 * pt
+px2 = -B * sp.cos(b * pt) 
+py2 = 0.0 * pt 
+pz2 = 0.0 * pt 
+q2 = -1.0
 
 
-vx_simp= sp.diff(px_simp, pt)
-vy_simp= sp.diff(py_simp, pt)
-vz_simp= sp.diff(pz_simp, pt)
+part1 = createParticleTrayectories(px1, py1, pz1, q1)
+part2 = createParticleTrayectories(px2, py2, pz2, q2)
 
-Ax_simp= sp.diff(vx_simp, pt)
-Ay_simp= sp.diff(vy_simp, pt)
-Az_simp= sp.diff(vz_simp, pt)
-
-
-
-px = sp.lambdify((pt),px_simp)
-py = sp.lambdify((pt),py_simp)
-pz = sp.lambdify((pt),pz_simp)
-
-
-vx = sp.lambdify((pt),vx_simp)
-vy = sp.lambdify((pt),vy_simp)
-vz = sp.lambdify((pt),vz_simp)
-
-
-Ax = sp.lambdify((pt),Ax_simp)
-Ay = sp.lambdify((pt),Ay_simp)
-Az = sp.lambdify((pt),Az_simp)
-
-
-ps = [px, py, pz]
-vs = [vx, vy, vz]
-As = [Ax, Ay, Az]
-
+particles = [part1, part2]
 
 def eval_position(ps, retT):
     """Evaluate position functions, handling constants properly."""
@@ -166,68 +172,74 @@ def compute_retarded(points, t, ps, vs, chunk_size=5000):
     return retT
 
 
-def vectorField(points, ps, vs, As, t):
-    
-
+def vectorField(points, particles, t):
     """ Contruction of the electric field """ 
-   
-    # Calculate retarded times for all points
-    retT = compute_retarded(points, t, ps, vs) 
-
-    # Retarded positions and velocities
-    ptr = eval_position(ps, retT)
-    vtr = eval_position(vs, retT)
-    atr = eval_position(As, retT)
-
-
-    # Retarded displacement vector and related quantities
-    R_vec = points - ptr  # R = x - r(τ)
-    R = np.linalg.norm(R_vec, axis=1)  # |R|
-    R_uni = R_vec / R[:, np.newaxis]  # n = R/|R|
     
+    total_vectors_el = np.zeros((points.shape[0], 3)) 
+    total_vectors_mag = np.zeros((points.shape[0], 3)) 
+    total_vectors_poynting = np.zeros((points.shape[0], 3)) 
 
-    # Retarded velocity squared
-    v2 = np.sum(vtr**2, axis = 1)
-    
-    # Vector u 
-    u = c * R_uni - vtr
+    for part in particles: 
+        # Calculate retarded times for all points
+        ps, vs, As, qp = part
+        retT = compute_retarded(points, t, ps, vs) 
 
-    # Variable outside factor 
-    var_out_fac = R / np.power( np.sum(R_vec * u, axis = 1) , 3)
+        # Retarded positions and velocities
+        ptr = eval_position(ps, retT)
+        vtr = eval_position(vs, retT)
+        atr = eval_position(As, retT)
 
-    # Velocity term 
-    vel_term = (c**2 - v2)[:, np.newaxis] * u 
-    
-    # Aceleration term 
-    acc_term = np.cross( R_vec, np.cross( u, atr ) ) 
 
-    # Total term 
-    total = var_out_fac[:, np.newaxis] * (vel_term + acc_term)
+        # Retarded displacement vector and related quantities
+        R_vec = points - ptr  # R = x - r(τ)
+        R = np.linalg.norm(R_vec, axis=1)  # |R|
+        R_uni = R_vec / R[:, np.newaxis]  # n = R/|R|
+        
 
-    # Electric field components
-    rx = factor * total[:, 0]
-    ry = factor * total[:, 1]  
-    rz = factor * total[:, 2]
+        # Retarded velocity squared
+        v2 = np.sum(vtr**2, axis = 1)
+        
+        # Vector u 
+        u = c * R_uni - vtr
 
-    """ RETURN OF VALUES: DO NOT TOUCH """
-    
-    # Reconstructing the mesh 
-    vectors_el = np.column_stack((rx, ry, rz))
-    vectors_mag = 1.0 / c * np.cross(R_uni, vectors_el, axis = 1)
+        # Variable outside factor 
+        var_out_fac = R / np.power( np.sum(R_vec * u, axis = 1) , 3)
 
-    
-    magnitudes_el = np.linalg.norm(vectors_el, axis = 1)
-    magnitudes_mag = np.linalg.norm(vectors_mag, axis = 1)
+        # Velocity term 
+        vel_term = (c**2 - v2)[:, np.newaxis] * u 
+        
+        # Aceleration term 
+        acc_term = np.cross( R_vec, np.cross( u, atr ) ) 
 
-    if do_poynting:
-        vectors_poynting = (1.0 / mu0) * np.cross(vectors_el, vectors_mag, axis = 1)
-        magnitudes_poynting = np.linalg.norm(vectors_poynting, axis = 1)
-    else:
-        vectors_poynting = np.zeros_like(vectors_el)
-        magnitudes_poynting = np.zeros_like(magnitudes_el)
+        # Total term 
+        total = qp * var_out_fac[:, np.newaxis] * (vel_term + acc_term)
 
-    
-    return vectors_el, vectors_mag, vectors_poynting, magnitudes_el, magnitudes_mag, magnitudes_poynting
+
+        # Electric field components
+        rx = factor * total[:, 0]
+        ry = factor * total[:, 1]  
+        rz = factor * total[:, 2]
+
+        """ RETURN OF VALUES: DO NOT TOUCH """
+        
+        # Reconstructing the mesh 
+        vectors_el = np.column_stack((rx, ry, rz))
+        vectors_mag = 1.0 / c * np.cross(R_uni, vectors_el, axis = 1)
+
+        if do_poynting:
+            vectors_poynting = (1.0 / mu0) * np.cross(vectors_el, vectors_mag, axis = 1)
+        else:
+            vectors_poynting = np.zeros_like(vectors_el)
+        
+        total_vectors_el += vectors_el
+        total_vectors_mag += vectors_mag
+        total_vectors_poynting += vectors_poynting
+            
+    magnitudes_el = np.linalg.norm(total_vectors_el, axis = 1)
+    magnitudes_mag = np.linalg.norm(total_vectors_mag, axis = 1)
+    magnitudes_poynting = np.linalg.norm(total_vectors_poynting, axis = 1)
+
+    return total_vectors_el, total_vectors_mag, total_vectors_poynting, magnitudes_el, magnitudes_mag, magnitudes_poynting
 
 
 
@@ -239,29 +251,38 @@ def vectorField(points, ps, vs, As, t):
 """ CREATING THE MESH """
 
 
-x = np.linspace(-limitsx, limitsx, densityx)
-y = np.linspace(-limitsy, limitsy, densityy)
-z = np.linspace(-limitsz, limitsz, densityz)
+if cords == "cart":
+    x = np.linspace(-limitsx, limitsx, densityx)
+    y = np.linspace(-limitsy, limitsy, densityy)
+    z = np.linspace(-limitsz, limitsz, densityz)
 
-X, Y, Z = np.meshgrid(x, y, z)
+    X, Y, Z = np.meshgrid(x, y, z)
+else:
 
+    # Define spherical coordinates
+    r = np.linspace(0, rad_lim, rad_den)             # radius
+    theta = np.linspace(0, np.pi, theta_den)     # polar angle (0 → π)
+    phi = np.linspace(0, 2*np.pi, phi_den)     # azimuthal angle (0 → 2π)
 
+    # Create meshgrid
+    R, THETA, PHI = np.meshgrid(r, theta, phi, indexing='ij')
 
+    # Convert to Cartesian
+    X = R * np.sin(THETA) * np.cos(PHI)
+    Y = R * np.sin(THETA) * np.sin(PHI)
+    Z = R * np.cos(THETA)
 
 points = np.column_stack((X.ravel(), Y.ravel(), Z.ravel()))
-
-
+""" CREATION OF THE ANIMATION """
 # Create the first frame
-
-vectors_el, vectors_mag, vectors_poynting, magnitudes_el, magnitudes_mag, magnitudes_poynting = vectorField(points, ps, vs, As, t=0)
-
-
 plotter = pv.Plotter()
 plotter.set_background('black')
+plotter.show_grid(color = "gray")
 
 pdata = pv.PolyData(points)
 
 
+vectors_el, vectors_mag, vectors_poynting, magnitudes_el, magnitudes_mag, magnitudes_poynting = vectorField(points, particles, t=0)
 if do_poynting:
 
     pdata['magnitude_poynting'] = np.clip(magnitudes_poynting, None, 1.0) * mag_poynting # attach scalars for color
@@ -323,27 +344,30 @@ else:
     )
 
 
+spheres = list()
+spheres_act = list()
 
-# Create a sphere (ball)
-sphere = pv.Sphere(radius=0.05, center=(0, 0, 0))
+for i, part in enumerate(particles):
+    # Create a sphere (ball)
+    spheres.append(pv.Sphere(radius=0.05, center=(0, 0, 0)))
 
-# Add it to the scene
-act_sphere = plotter.add_mesh(sphere, color="red", specular=0.4, smooth_shading=True)
+    # Add it to the scene
+    spheres_act.append(plotter.add_mesh(spheres[i], color="red" if part[3] > 0 else "blue", specular=0.4, smooth_shading=True))
 
-plotter.show_grid(color = "gray")
 
 
 
 # --- Animation callback using timer events ---
 def update_field(t):
 
-    vectors_el, vectors_mag, vectors_poynting, magnitudes_el, magnitudes_mag, magnitudes_poynting = vectorField(points, ps, vs, As, t)
+    vectors_el, vectors_mag, vectors_poynting, magnitudes_el, magnitudes_mag, magnitudes_poynting = vectorField(points, particles, t)
 
 
     if do_poynting:  
-        cons = 0.3
+        cons = 0.25
+        check_col = 5 
         pdata['magnitude_poynting'] = np.power(np.clip(magnitudes_poynting, None, 1.0), cons)
-        pdata['col_poynting'] = magnitudes_poynting / np.partition(magnitudes_poynting, -5)[-5] * 255.0
+        pdata['col_poynting'] = np.sqrt(magnitudes_poynting / np.partition(magnitudes_poynting, -check_col)[-check_col] )
         pdata['vectors_poynting'] = vectors_poynting
         new_arrows_poynting = pdata.glyph(orient='vectors_poynting', scale=doScale_poynting, factor=scaleFactor)
         actor_poynting.mapper.SetInputData(new_arrows_poynting)
@@ -374,10 +398,14 @@ def update_field(t):
 
 
     # --- Move the sphere properly ---
-    new_center = np.array([px(t), py(t), pz(t)])
-    displacement = new_center - sphere.center
+    for i, part in enumerate(particles):
+        ps, _, _, q = part
+        px, py, pz = ps
 
-    sphere.translate(displacement, inplace=True)  # moves geometry
+        new_center = np.array([px(t), py(t), pz(t)])
+        displacement = new_center - spheres[i].center
+
+        spheres[i].translate(displacement, inplace=True)  # moves geometry
 
 
 # --- Play animation with interactive control ---

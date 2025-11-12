@@ -8,7 +8,7 @@ from functools import partial
 
 
 do_poynting = False
-
+doMesh = "cyl"
 
 doScale_el = "magnitude_el" 
 doScale_mag = "magnitude_mag"
@@ -17,15 +17,15 @@ doScale_poynting = "magnitude_poynting"
 scaleFactor = 1.0
 
 
-mag_el = 1.0
-mag_mag = 1.0 
+mag_el = 0.1
+mag_mag = 0.2 
 mag_poynting = 1.0
 
 dt = 0.1
 
 t0 = 5.0
 
-a = 0.03 
+a = 0.6
 b = 3.0 
 B = 0.1
 
@@ -41,7 +41,7 @@ limitsx = 2.0
 densityy = 51 
 limitsy = 5.0
 
-densityz = 3 
+densityz = 10 
 limitsz = 1.0
 
 
@@ -57,7 +57,7 @@ pt = sp.Symbol("pt")
 
 
 px_simp = 0.0 * pt  
-py_simp = a * pt * pt - 8.1251241 
+py_simp = a * pt - 8.1251241 
 pz_simp = 0.0 * pt
 
 
@@ -239,11 +239,24 @@ def vectorField(points, ps, vs, As, t):
 """ CREATING THE MESH """
 
 
-x = np.linspace(-limitsx, limitsx, densityx)
-y = np.linspace(-limitsy, limitsy, densityy)
-z = np.linspace(-limitsz, limitsz, densityz)
+if doMesh == "cart":
+    x = np.linspace(-limitsx, limitsx, densityx)
+    y = np.linspace(-limitsy, limitsy, densityy)
+    z = np.linspace(-limitsz, limitsz, densityz)
 
-X, Y, Z = np.meshgrid(x, y, z)
+    X, Y, Z = np.meshgrid(x, y, z)
+elif doMesh == "cyl":
+    # Radial, angular, and vertical sampling
+    r = np.linspace(0, 2, 15)       # uniform in radius
+    theta = np.linspace(0, 2*np.pi, 30)
+    z = np.linspace(-5, 5, 50)
+
+    # Create mesh in cylindrical coordinates
+    R, THETA, Y = np.meshgrid(r, theta, z, indexing='ij')
+
+    # Convert to Cartesian
+    X = R * np.cos(THETA)
+    Z = R * np.sin(THETA)
 
 
 

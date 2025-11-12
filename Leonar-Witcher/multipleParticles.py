@@ -33,8 +33,8 @@ def createParticleTrayectories(px_simp, py_simp, pz_simp, qp):
     return (ps, vs, As, qp)
 
 
-do_poynting = False
-cords = "sphe"
+do_poynting = True
+cords = "cart"      # cart
 
 doScale_el = "magnitude_el" 
 doScale_mag = "magnitude_mag"
@@ -52,23 +52,34 @@ dt = 0.1
 t0 = 5.0
 
 a = 0.03 
-b = 4.0 
-B = 0.05
+b = 3.0 
+B = 0.01
 
 epsilon0 = 1.0
 c = 1.0
 factor = (1.0 / (4 * np.pi * epsilon0))
 mu0 = 1.0
 
-densityx = 30 
-limitsx = 5.0
 
-densityy = 30 
+# To show transversal propagation
+densityx = 31 
+limitsx = 1.0
+
+densityy = 51 
 limitsy = 5.0
 
-densityz = 30 
+densityz = 51 
 limitsz = 5.0
 
+# To show paralel propagation
+# densityx = 51 
+# limitsx = 5.0
+#
+# densityy = 51 
+# limitsy = 5.0
+#
+# densityz = 11 
+# limitsz = 1.0
 
 rad_lim = 5
 rad_den = 8 
@@ -87,7 +98,7 @@ q1 = 1.0
 
 
 px2 = -B * sp.cos(b * pt) 
-py2 = 0.0 * pt 
+py2 = 0.0 * pt
 pz2 = 0.0 * pt 
 q2 = -1.0
 
@@ -367,7 +378,7 @@ def update_field(t):
         cons = 0.25
         check_col = 5 
         pdata['magnitude_poynting'] = np.power(np.clip(magnitudes_poynting, None, 1.0), cons)
-        pdata['col_poynting'] = np.sqrt(magnitudes_poynting / np.partition(magnitudes_poynting, -check_col)[-check_col] )
+        pdata['col_poynting'] = np.power(magnitudes_poynting / np.partition(magnitudes_poynting, -check_col)[-check_col], 1.5 )
         pdata['vectors_poynting'] = vectors_poynting
         new_arrows_poynting = pdata.glyph(orient='vectors_poynting', scale=doScale_poynting, factor=scaleFactor)
         actor_poynting.mapper.SetInputData(new_arrows_poynting)

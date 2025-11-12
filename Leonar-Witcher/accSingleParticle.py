@@ -35,10 +35,10 @@ c = 1.0
 factor = (q / (4 * np.pi * epsilon0))
 mu0 = 1.0
 
-densityx = 50 
-limitsx = 5.0
+densityx = 51 
+limitsx = 2.0
 
-densityy = 50 
+densityy = 51 
 limitsy = 5.0
 
 densityz = 3 

@@ -31,7 +31,7 @@ def vectorField(points, t):
 
     mag_mag = np.where(
         valid,
-        -mu0 * q0 * t * c / (2 * np.pi) / np.sqrt(inside) / s,
+        -mu0 * q0 * s * c / (2 * np.pi) / np.power(inside, 1.5),
         0.0
     )
 
@@ -45,7 +45,7 @@ def vectorField(points, t):
 
     mag_el = np.where(
         valid, 
-        -1.0 / (2. * np.pi * np.sqrt( inside) ),
+        -(q0 * c) / (2 * np.pi * epsilon0 * np.power( inside, 1.5 ) ),
         0.0
     )
 
@@ -201,12 +201,12 @@ def restart():
     t = 0.0
 
 
+
 # Keyboard event for spacebar
 plotter.add_key_event("space", toggle_pause)
 plotter.add_key_event("n", past)
 plotter.add_key_event("m", future)
-plotter.add_key_event("b", future)
-
+plotter.add_key_event("b", restart)
 
 
 while True:

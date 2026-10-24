@@ -6,6 +6,7 @@ doScale_el = "magnitude_el"
 doScale_mag = "magnitude_mag" 
 # doScale = "magnitude"
 scaleFactor = 0.5
+
 def vectorField(points, t):
     
     # Taking the points
@@ -29,7 +30,7 @@ def vectorField(points, t):
 
     mag_mag = np.where(
         valid,
-        mu0 * i0 / (2 * np.pi * s) * (c*t) / np.sqrt(inside),
+        1.0 / (2 * np.pi * s) * (t) / np.sqrt(inside),
         0.0
     )
 
@@ -43,7 +44,7 @@ def vectorField(points, t):
 
     mag_el = np.where(
         valid, 
-        -(mu0 * i0 * c) / (2 * np.pi * np.sqrt( inside ) ),
+        -(1.0) / (2 * np.pi * np.sqrt( inside ) ),
         0.0
     )
 
@@ -196,11 +197,14 @@ def past():
 def future():
     global t
     t += 1.0
-
+def restart():
+    global t
+    t = 0.0
 
 # Keyboard event for spacebar
 plotter.add_key_event("n", past)
 plotter.add_key_event("m", future)
+plotter.add_key_event("b", restart)
 
 
 

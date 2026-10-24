@@ -40,7 +40,7 @@ def vectorField(points, t):
 
     mag_mag = np.where(
         valid,
-        mu0 * k * c / (2 * np.pi * s) * (t**2 - (s**2) / c**2) / np.sqrt(inside),
+        k / (2 * np.pi * s) * (t**2 - (s**2) / c**2) / np.sqrt(inside),
         0.0
     )
 
@@ -209,12 +209,15 @@ def past():
 def future():
     global t
     t += 1.0
+def restart():
+    global t
+    t = 0.0
 
 
 # Keyboard event for spacebar
 plotter.add_key_event("n", past)
 plotter.add_key_event("m", future)
-
+plotter.add_key_event("b", restart)
 
 
 while True:

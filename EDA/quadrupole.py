@@ -22,25 +22,27 @@ import sympy as sp
 @dataclass
 class Config:
     # Field
-    softening: float = 1.0          # avoids 1/R^2 blow-up on a charge
-    radiation_only: bool = False     # True: keep only the 1/R acceleration term
+    softening: float = 1e-3          # avoids 1/R^2 blow-up on a charge
+    radiation_only: bool = True     # True: keep only the 1/R acceleration term
     # Arrow scaling
-    distance_weighting: float = 1.0  # E -> E * R^p ; p=1 removes the 1/R fall-off
-    arrow_length: float = 0.9        # length of the largest arrow (data units)
+    distance_weighting: float = 0.1  # E -> E * R^p ; p=1 removes the 1/R fall-off
+    arrow_length: float = 0.1        # length of the largest arrow (data units)
     normalize_per_frame: bool = False  # False: arrows "breathe" in time, shape is exact
                                        # True : largest arrow always has arrow_length
+    envelope_lengths: bool = True    # arrow length = per-point peak over a period
+
     # Time
-    dt: float = 1e-3
+    dt: float = 1e-2
     t_start: float = 0.0
     # Oscillation (v_max = amplitude * omega must be < 1)
     amplitude: float = 1e-6
-    omega: float = 5.0
+    omega: float = 5.0 * np.pi
     # Mesh: "meridian" | "shell" | "parallel" | "transversal" | "spherical"
     mesh: str = "shell"
     shell_radius: float = 15.0        # outermost shell
-    shell_radius_min: float = 8.0    # innermost shell
-    n_shells: int = 8                # 1 = single shell at shell_radius
-    arrow_length: float = 1.0       # reduced so neighbouring shells don't overlap
+    shell_radius_min: float = 10.    # innermost shell
+    n_shells: int = 30                # 1 = single shell at shell_radius
+    arrow_length: float = 0.5       # reduced so neighbouring shells don't overlap
 
 
 CFG = Config()
@@ -248,20 +250,23 @@ def scaled_field(points, charges, t, cfg: Config = CFG):
     return E, np.linalg.norm(E, axis=1)
 
 
-def calibrate(points, charges, cfg: Config = CFG, n_samples=16):
+def calibrate(points, charges, cfg: Config = CFG, n_samples=24):
     """
     Sample one oscillation period and return
-      ref   : peak of the scaled |E| (fixed normalization for arrow lengths)
+      ref   : peak of the scaled |E| over all points and times
       shape : scaled |E| / ref at the instant of that peak
+      env   : per-point peak of scaled |E| over the period (N,)
     """
     T = 2.0 * np.pi / cfg.omega
     ref, shape = 0.0, None
+    env = np.zeros(len(points))
     for k in range(n_samples):
         _, mag = scaled_field(points, charges, cfg.t_start + k * T / n_samples, cfg)
+        env = np.maximum(env, mag)
         m = mag.max()
         if m > ref:
             ref, shape = m, mag / m
-    return ref, shape
+    return ref, shape, env
 
 
 def polar_angle(points):
@@ -359,7 +364,7 @@ class FieldViewer:
         self.running = True
 
         # Fixed normalization + pattern check
-        self.ref, shape = calibrate(points, charges, cfg)
+        self.ref, shape, self.env = calibrate(points, charges, cfg) 
         if cfg.pattern and cfg.mesh in ("meridian", "shell"):
             err = pattern_rms_error(points, shape, cfg.pattern)
             print(f"RMS deviation from ideal {cfg.pattern} pattern: {err:.3f} "
@@ -405,12 +410,17 @@ class FieldViewer:
     def _update_arrays(self, t):
         cfg = self.cfg
         E, mag = scaled_field(self.points, self.charges, t, cfg)
-        ref = mag.max() if cfg.normalize_per_frame else self.ref
-        ref = ref if ref > 0 else 1.0
-        rel = mag / ref                                   # 1 = peak amplitude
+        env_max = self.env.max() if self.env.max() > 0 else 1.0
+        if cfg.envelope_lengths:
+            length = self.env / env_max                    # static angular pattern
+            phase = mag / np.maximum(self.env, 1e-12)      # 0..1, travelling wave
+        else:
+            ref = mag.max() if cfg.normalize_per_frame else self.ref
+            length = mag / (ref if ref > 0 else 1.0)
+            phase = length
         self.pdata["vectors_el"] = E
-        self.pdata["magnitude_el"] = np.maximum(cfg.arrow_length * rel, 1e-6)  # linear!
-        self.pdata["col_el"] = np.clip(rel, 0.0, 1.0)
+        self.pdata["magnitude_el"] = np.maximum(cfg.arrow_length * length, 1e-6)
+        self.pdata["col_el"] = np.clip(phase, 0.0, 1.0)
 
     def _glyphs(self):
         return self.pdata.glyph(orient="vectors_el", scale="magnitude_el", factor=1.0)
@@ -445,9 +455,9 @@ if __name__ == "__main__":
     # ---- Linear quadrupole: |sin(2 theta)| (uncomment) ----------------------
     CFG.pattern = "sin2"
     # charges = make_oscillating_quadrupole(CFG, d=0.05)   # keep omega*d << 1
-    charges = make_breathing_quadrupole(CFG, d=0.05)     # alternative
+    charges = make_breathing_quadrupole(CFG, d=0.1)     # alternative
 
-    CFG.mesh = "meridian"   # full 3D sphere instead of the x-z ring
+    CFG.mesh = "spherical"   # full 3D sphere instead of the x-z ring
 
     for i, ch in enumerate(charges):
         vmax = ch.max_speed()
